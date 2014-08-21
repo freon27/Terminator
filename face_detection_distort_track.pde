@@ -32,9 +32,11 @@ PImage tvnoise;
 PImage targetImage;
 PImage gun;
 PImage targetReticule;
+PImage targetReticuleBright;
 PGraphics pg;
+boolean currentTargetPositive = false;
 
-int target;
+int target = -1;
 
 int barY1=10;
 int barY2=30;
@@ -77,6 +79,8 @@ class Face {
   int insult1 = int(random(0, insults.length));
   
   int insult2 = int(random(0, insults.length));
+  
+  
  
   int threatLevel = int(random(0, 25));
  
@@ -94,6 +98,9 @@ class Face {
     id = faceCount;
     faceCount++;
     facesProgress[id] = 0;
+    while(insult1 == insult2){
+      insult2 = int(random(0, insults.length));
+    }
   }
 
   // Show me
@@ -169,9 +176,8 @@ void setup() {
   faceList = new ArrayList<Face>();
   
   insults = loadStrings("insults.txt");
-  
-  
-  gun = loadImage("gun02.jpg");
+ 
+  gun = loadImage("handgun.png");
   
   symbols[0] = "|";
   symbols[1] = "/";
@@ -192,7 +198,8 @@ void setup() {
   TVOverlay=loadImage("tv.png");
 
   targetReticule = loadImage("target.png");
-  
+  targetReticuleBright = loadImage("targ_bright.png");
+   
   // precalculate tv noise
   tvnoise = createImage(w,h,RGB);
 
@@ -226,14 +233,15 @@ void draw() {
   tvscreen.filter(POSTERIZE, 8);
   pg.image(tvscreen, 0, 0);
   pg.tint(255,150,150, 100);
-  //image(gun, 640 / (gun.width / 4) , 480 - gun.width / 2 , gun.width / 2, gun.width /2 );
+  
   pg.fill(100,100,100,60);
   pg.noStroke();
   pg.strokeWeight(0);
   Rectangle[] faces = opencv.detect();
   println(faces.length);
-  
-  
+  //pg.image(gun, 640 - (gun.width / 4) , 480 - gun.width / 2 , gun.width / 2, gun.width /2 );
+  pg.image(gun, 0,0,gun.width / 2, gun.width /2   );
+ 
  
   // SCENARIO 1: faceList is empty
   if (faceList.isEmpty()) {
@@ -301,6 +309,9 @@ void draw() {
       if (f.available) {
         f.countDown();
         if (f.dead()) {
+          if(f.id == target){
+             target = -1; 
+          }
           f.delete = true;
           faceList.remove(f);
         } 
@@ -322,33 +333,24 @@ void draw() {
   
   for (int i = 0; i < faceList.size(); i++) {
     Face f = (Face) faceList.get(i);
-    if(target == 0){
+    if(target == -1 && facesProgress[f.id] == 0){
+      target = f.id;
+    }
+    if(facesProgress[f.id] <= 80){
+      facesProgress[f.id]++;
+    }
+    if(f.id == target){
       targetImage = new PImage(50, 50);
       targetImage.copy(video, f.r.x, f.r.y, f.r.width, f.r.height, 0, 0, 50 , 50);
       targetImage.filter(POSTERIZE, 8);
-      target = f.id;
-      pg.image(targetReticule, f.r.x + (f.r.width / 2) - 25, f.r.y + (f.r.height / 2) -25, 50, 50);
-      /*
-      float targetDiameter = f.r.width * 1.2;
-      pg.beginShape();
-      pg.noStroke();
-      pg.ellipse(f.r.x + (f.r.width / 2), f.r.y + (f.r.height / 2), targetDiameter, targetDiameter);
-      pg.beginContour();
-      pg.fill(0,0,0,50);
-      pg.ellipse(f.r.x + (f.r.width / 2), f.r.y + (f.r.height / 2), targetDiameter * 0.75, targetDiameter * 0.75);
-      pg.endContour();
-      //pg.fill(100,100,100,50);
-      pg.ellipse(f.r.x + (f.r.width / 2), f.r.y + (f.r.height / 2), targetDiameter * 0.70, targetDiameter * 0.70);
-      //pg.fill(0,0,0,100);
-      pg.rect(f.r.x + (f.r.width * 0.07), f.r.y + ((f.r.height / 2) - 2 ), targetDiameter * 0.73, 4);
-      pg.rect(f.r.x + (f.r.width / 2), f.r.y + ((f.r.height / 2) - 5 ), 2, 10);
-      pg.rect(f.r.x + (f.r.width / 2), f.r.y - (f.r.width / 2), 2, 10);
-      pg.endShape();
-      */
+      
+      if(currentTargetPositive){
+        pg.image(targetReticuleBright, f.r.x + (f.r.width / 2) - 25, f.r.y + (f.r.height / 2) -25, 50, 50);
+      }
+      else {
+        pg.image(targetReticule, f.r.x + (f.r.width / 2) - 25, f.r.y + (f.r.height / 2) -25, 50, 50);
+      }
     }
-    if(facesProgress[f.id] < 70){
-      facesProgress[f.id]++;
-    } 
   }
     
     
@@ -356,36 +358,16 @@ void draw() {
   if(faces.length > 0){
     pg.fill(255);
     pg.textSize(12);
-    pg.text("Target Acquired", 10, tvheight - 40);
+    if(target != -1 ){
+      pg.text("Target Acquired", 10, tvheight - 20);
+    }
   }
   
   
   
   fft.window(FFT.HAMMING);
 
-/*
- for(int i = 0; i < fft.specSize(); i++)
- {
-   // draw the line for frequency band i, scaling it by 4 so we can
-   //see it a bit better
-   //line(i, height, i, height - fft.getBand(i)*4);
-   if (fft.getBand(i) > loudestFreqAmp && fft.getBand(i) > 10)
-   {
-     loudestFreqAmp = fft.getBand(i);
-     loudestFreq = i * 4;
-     //sine.setFreq(loudestFreq);
-     fill(loudestFreq * 10, 255 - loudestFreq, loudestFreq * 20, 128 );
-     if(loudestFreq < 25)
-     {
-       rect(random(0,100), random(0,50), loudestFreqAmp, loudestFreqAmp);
-     }
-     else
-     {
-       ellipse(random(0,100), random(0,50), loudestFreqAmp, loudestFreqAmp);
-     }
-     timerCounter = 0;
-   }
- }*/
+
  loudestFreqAmp = 0;
  pg.strokeWeight(1);
  // draw the waveforms
@@ -415,7 +397,7 @@ void draw() {
   }
   
   
-  if(target != 0){
+  if(target != -1){
        //tint(255, 255, 255, 100);
        pg.image(targetImage, tvwidth - targetImage.width , 0);//width - targetImage.width, height - targetImage.height);
        pg.stroke(255,255,255, 80);
@@ -423,13 +405,39 @@ void draw() {
        pg.textSize(6);
        pg.text("Analyzing target database:", tvwidth - 130, 10);
        String bar = "|";
-       for(int i = 0; i <= 70; i+=5){
+       for(int i = 0; i <= 60; i+=5){
          if( i < facesProgress[target] ){
            bar = bar + "="; 
          }
        }
+       if (facesProgress[target] == 70 ){
+         currentTargetPositive = int(random(1, 100)) < 100;
+       }
+       
+       if ( facesProgress[target] >= 70 ){
+         if(currentTargetPositive){
+           pg.text("Terminate",  tvwidth - targetImage.width + 10, 20);
+         }
+         else {  
+           pg.text("Negative",  tvwidth - targetImage.width + 10, 20); 
+         }
+       }
+       
+       
+       
+       if ( facesProgress[target] >= 80 ){
+         target = -1;
+         targetImage = null;
+         currentTargetPositive = false;
+       }
        pg.text(bar, tvwidth - 130, 20);
        pg.text("|", tvwidth - 60, 20);
+       
+       
+       if ( target != -1 && currentTargetPositive && (facesProgress[target] == 77 || facesProgress[target] == 79)){
+         pg.fill(255,255,255,80);
+         pg.rect(0, 0, displayWidth, displayHeight);
+       }
     }
     pg.endDraw();
     image(pg, 0, 0, displayWidth, displayHeight);
